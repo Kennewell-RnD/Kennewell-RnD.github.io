@@ -1,4 +1,3 @@
-[index (1).html](https://github.com/user-attachments/files/26627503/index.1.html)
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -8,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@500&display=swap" rel="stylesheet" />
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; min-width: 0; }
 :root {
   --yellow: #F5B800;
   --yellow-d: #C49200;
@@ -45,7 +45,7 @@ body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; ba
 .admin-pill.on { background: var(--yellow); color: var(--dark); border-color: var(--yellow); }
 
 /* Nav */
-.nav { display: flex; gap: 6px; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px; width: fit-content; margin-bottom: 1.75rem; box-shadow: var(--shadow-sm); }
+.nav { display: flex; gap: 6px; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px; width: fit-content; max-width: 100%; margin-bottom: 1.75rem; box-shadow: var(--shadow-sm); }
 .nav-btn { font-family: inherit; font-size: 13.5px; font-weight: 600; border: none; padding: 9px 20px; border-radius: 10px; cursor: pointer; background: none; color: var(--grey-m); transition: all .18s; letter-spacing: -.1px; }
 .nav-btn.active { background: var(--yellow); color: var(--dark); box-shadow: 0 1px 4px rgba(245,184,0,.4); }
 .nav-btn:not(.active):hover { background: var(--grey-l); color: var(--grey); }
@@ -88,8 +88,8 @@ textarea { min-height: 92px; line-height: 1.6; resize: vertical; }
 .section-title { font-size: 11px; font-weight: 700; letter-spacing: .07em; color: var(--grey-m); text-transform: uppercase; margin-bottom: 1rem; margin-top: 1.75rem; }
 
 /* Tables */
-.table-wrap { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem; overflow-x: auto; box-shadow: var(--shadow-sm); }
-table { width: 100%; border-collapse: collapse; }
+.table-wrap { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 1.5rem; overflow-x: auto; box-shadow: var(--shadow-sm); width: 100%; display: block; }
+table { width: 100%; min-width: 500px; border-collapse: collapse; table-layout: auto; }
 th { padding: 12px 16px; text-align: left; font-weight: 700; font-size: 11px; letter-spacing: .05em; color: var(--dark); background: var(--yellow); white-space: nowrap; text-transform: uppercase; }
 td { padding: 12px 16px; font-size: 13.5px; border-bottom: 1px solid var(--grey-l); color: var(--grey); vertical-align: middle; }
 tr:last-child td { border-bottom: none; }
@@ -107,8 +107,8 @@ tr:hover td { background: #FFFBEF; }
 .empty { text-align: center; padding: 3rem; color: var(--grey-m); font-size: 14px; font-weight: 500; }
 
 /* Progress bar */
-.bar-bg { height: 6px; background: var(--grey-l); border-radius: 3px; overflow: hidden; min-width: 80px; }
-.bar-fill { height: 100%; background: var(--yellow); border-radius: 3px; }
+.bar-bg { height: 8px; background: var(--grey-l); border-radius: 4px; overflow: hidden; width: 120px; border: 1px solid var(--border); }
+.bar-fill { height: 100%; background: linear-gradient(90deg, var(--yellow) 0%, #FFD000 100%); border-radius: 4px; transition: width .4s ease; min-width: 0; }
 
 /* Action buttons */
 .action-btn { font-family: inherit; font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 7px; cursor: pointer; border: none; transition: all .15s; white-space: nowrap; letter-spacing: .01em; }
