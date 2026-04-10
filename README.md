@@ -1,4 +1,4 @@
-[index.html](https://github.com/user-attachments/files/26627399/index.html)
+[index (1).html](https://github.com/user-attachments/files/26627503/index.1.html)
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -30,8 +30,8 @@
   --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06);
   --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
 }
-body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--grey-l); color: var(--grey); min-height: 100vh; -webkit-font-smoothing: antialiased; }
-.app { max-width: 980px; margin: 0 auto; padding: 1.5rem 1rem 5rem; }
+body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--grey-l); color: var(--grey); min-height: 100vh; -webkit-font-smoothing: antialiased; width: 100%; }
+.app { max-width: 980px; width: 100%; margin: 0 auto; padding: 1.5rem 1rem 5rem; }
 
 /* Banner */
 .banner { background: var(--dark); border-radius: 20px; padding: 1.5rem 2rem; margin-bottom: 1.75rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; box-shadow: var(--shadow); }
@@ -157,8 +157,10 @@ tr:hover td { background: #FFFBEF; }
 .toast.success { background: var(--green-d); }
 .toast.error { background: var(--red); }
 
-.tab { display: none; }
-.tab.active { display: block; }
+.tab { display: none; width: 100%; }
+.tab.active { display: block; width: 100%; }
+.stat-grid { width: 100%; }
+.table-wrap { width: 100%; }
 
 @media (max-width: 620px) {
   .grid2, .modal-grid { grid-template-columns: 1fr; }
@@ -714,4 +716,4 @@ document.querySelector('#tab-data .filter-bar').insertAdjacentHTML('beforeend',
 loadTeam();
 </script>
 </body>
-</html> index.html…]()
+</html>
