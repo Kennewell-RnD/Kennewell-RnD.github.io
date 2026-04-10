@@ -108,7 +108,8 @@ tr:hover td { background: #FFFBEF; }
 .empty { text-align: center; padding: 3rem; color: var(--grey-m); font-size: 14px; font-weight: 500; }
 
 /* Progress bar */
-.bar-bg { height: 8px; background: var(--grey-l); border-radius: 4px; overflow: hidden; width: 120px; border: 1px solid var(--border); }
+.bar-bg { height: 8px; background: transparent; border-radius: 4px; overflow: hidden; width: 120px; border: 1px solid transparent; }
+.bar-bg.has-value { background: var(--grey-l); border-color: var(--border); }
 .bar-fill { height: 100%; background: linear-gradient(90deg, var(--yellow) 0%, #FFD000 100%); border-radius: 4px; transition: width .4s ease; min-width: 0; }
 
 /* Action buttons */
@@ -641,14 +642,14 @@ function renderDashboard() {
     const last = pe.length ? fmtDate([...pe].sort((a,b) => b.date.localeCompare(a.date))[0].date) : "—";
     return { name: p, hrs, cnt: pe.length, last };
   });
-  const maxHrs = Math.max(...personRows.map(r => r.hrs), 1);
+  const totalForBar = personRows.reduce((s,r) => s + r.hrs, 0) || 1;
   document.querySelector("#person-table tbody").innerHTML = personRows.map(r =>
     "<tr>" +
     "<td class='bold'>" + r.name + "</td>" +
     "<td class='mono bold accent'>" + r.hrs.toFixed(1) + "</td>" +
     "<td>" + r.cnt + "</td>" +
     "<td class='muted'>" + r.last + "</td>" +
-    "<td><div class='bar-bg'><div class='bar-fill' style='width:" + (r.hrs/maxHrs*100) + "%'></div></div></td>" +
+    "<td><div class='bar-bg" + (r.hrs > 0 ? " has-value" : "") + "'><div class='bar-fill' style='width:" + (r.hrs/totalForBar*100) + "%'></div></div></td>" +
     "</tr>"
   ).join('');
 
