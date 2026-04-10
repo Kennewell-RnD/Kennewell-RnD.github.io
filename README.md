@@ -1,4 +1,4 @@
-[index.html](https://github.com/user-attachments/files/26627399/index.html)[Uploading<!DOCTYPE html>
+[index.html](https://github.com/user-attachments/files/26627399/index.html)
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
