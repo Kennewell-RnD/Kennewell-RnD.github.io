@@ -193,7 +193,7 @@ tr:hover td { background: var(--grey-l); }
   </div>
 
   <div class="admin-banner" id="admin-banner" style="display:none">
-    <span>🛡️ Admin mode active — edit entries, delete entries, and manage the team list</span>
+    <span>🛡️ Admin mode active — edit entries, delete entries, manage team &amp; projects</span>
     <button class="logout-btn" onclick="logoutAdmin()">Log out</button>
   </div>
 
@@ -226,6 +226,13 @@ tr:hover td { background: var(--grey-l); }
         <div>
           <label class="field-label">Financial Year (auto)</label>
           <input type="text" id="log-fy" readonly />
+        </div>
+        <div>
+          <label class="field-label">Project / Job</label>
+          <select id="log-project"><option value="">— Select project —</option></select>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="add-emp-btn" style="width:100%;padding:11px 14px;font-size:14px" onclick="openAddProjectInline()">＋ New Project</button>
         </div>
         <div class="full">
           <label class="field-label">Description of R&D Activity</label>
@@ -267,9 +274,10 @@ tr:hover td { background: var(--grey-l); }
       <select id="e-month" onchange="renderEntries()"><option value="">All Months</option></select>
       <select id="e-fy" onchange="renderEntries()"><option value="">All Financial Years</option></select>
       <select id="e-person" onchange="renderEntries()"><option value="">All People</option></select>
+      <select id="e-project" onchange="renderEntries()"><option value="">All Projects</option></select>
     </div>
     <div class="table-wrap"><table id="entries-table"><thead><tr>
-      <th>Person</th><th>Week Ending</th><th>Hours</th><th>Month</th><th>Fin. Year</th><th>Description</th>
+      <th>Person</th><th>Week Ending</th><th>Hours</th><th>Project</th><th>Month</th><th>Fin. Year</th><th>Description</th>
       <th id="actions-th" style="display:none">Actions</th>
     </tr></thead><tbody></tbody></table></div>
   </div>
@@ -313,6 +321,10 @@ tr:hover td { background: var(--grey-l); }
         <input type="text" id="edit-fy" readonly />
       </div>
       <div class="modal-full">
+        <label class="field-label">Project / Job</label>
+        <select id="edit-project"><option value="">— Select project —</option></select>
+      </div>
+      <div class="modal-full">
         <label class="field-label">Description</label>
         <textarea id="edit-desc"></textarea>
       </div>
@@ -349,6 +361,22 @@ tr:hover td { background: var(--grey-l); }
     </div>
     <div style="margin-top:1.25rem">
       <button class="btn-ghost" onclick="closeEmpModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Projects Modal -->
+<div class="modal-overlay hidden" id="proj-modal-overlay">
+  <div class="modal" style="max-width:460px">
+    <h2>🗂️ Manage Projects</h2>
+    <p style="font-size:13px;color:var(--text-m);margin-bottom:1.25rem;font-weight:500">Add or remove project/job classifications.</p>
+    <div class="emp-list" id="proj-list"></div>
+    <div class="add-emp-row">
+      <input type="text" id="new-proj-input" placeholder="Enter new project name…" onkeydown="if(event.key==='Enter')addProject()" />
+      <button class="add-emp-btn" onclick="addProject()">+ Add</button>
+    </div>
+    <div style="margin-top:1.25rem">
+      <button class="btn-ghost" onclick="closeProjModal()">Done</button>
     </div>
   </div>
 </div>
@@ -432,6 +460,85 @@ async function removeEmployee(index) {
   showToast(name + " removed.", "success");
 }
 
+// ── Project management ──
+const DEFAULT_PROJECTS = ["Automation", "Fixtures"];
+let projects = [...DEFAULT_PROJECTS];
+
+async function loadProjects() {
+  try {
+    const { data } = await db.from("rd_entries").select("description").eq("name","__proj_config__").limit(1);
+    if (data && data.length > 0) {
+      const parsed = JSON.parse(data[0].description);
+      if (Array.isArray(parsed) && parsed.length > 0) projects = parsed;
+    }
+  } catch(e) { /* use default */ }
+  populateProjectDropdowns();
+}
+async function saveProjects() {
+  const { data } = await db.from("rd_entries").select("id").eq("name","__proj_config__").limit(1);
+  if (data && data.length > 0) {
+    await db.from("rd_entries").update({ description: JSON.stringify(projects) }).eq("name","__proj_config__");
+  } else {
+    await db.from("rd_entries").insert({ name:"__proj_config__", date:"2000-01-01", hours:0, description: JSON.stringify(projects), month:"", fy:"" });
+  }
+}
+function populateProjectDropdowns() {
+  const baseOpt = '<option value="">— Select project —</option>';
+  const opts = baseOpt + projects.map(p => '<option>' + p + '</option>').join('');
+  document.getElementById('log-project').innerHTML = opts;
+  document.getElementById('edit-project').innerHTML = opts;
+  // update entries filter
+  const eProj = document.getElementById('e-project');
+  if (eProj) {
+    const val = eProj.value;
+    eProj.innerHTML = '<option value="">All Projects</option>' + projects.map(p => '<option' + (p===val?' selected':'') + '>' + p + '</option>').join('');
+  }
+}
+function renderProjList() {
+  document.getElementById('proj-list').innerHTML = projects.map((name, i) =>
+    "<div class='emp-row'><span>" + name + "</span><button class='remove-emp-btn' onclick='removeProject(" + i + ")'>Remove</button></div>"
+  ).join('');
+}
+function openProjModal() {
+  renderProjList();
+  document.getElementById('new-proj-input').value = '';
+  document.getElementById('proj-modal-overlay').classList.remove('hidden');
+}
+function closeProjModal() { document.getElementById('proj-modal-overlay').classList.add('hidden'); }
+async function addProject() {
+  const input = document.getElementById('new-proj-input');
+  const name = input.value.trim();
+  if (!name) return showToast("Please enter a project name.", "error");
+  if (projects.includes(name)) return showToast("Project already exists.", "error");
+  projects.push(name);
+  await saveProjects();
+  populateProjectDropdowns();
+  renderProjList();
+  input.value = '';
+  showToast(name + " added!", "success");
+}
+async function removeProject(index) {
+  const name = projects[index];
+  if (!confirm('Remove "' + name + '" from projects?')) return;
+  projects.splice(index, 1);
+  await saveProjects();
+  populateProjectDropdowns();
+  renderProjList();
+  showToast(name + " removed.", "success");
+}
+function openAddProjectInline() {
+  const name = prompt("Enter new project name:");
+  if (!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if (projects.includes(trimmed)) { showToast("Project already exists.", "error"); return; }
+  projects.push(trimmed);
+  saveProjects().then(() => {
+    populateProjectDropdowns();
+    document.getElementById('log-project').value = trimmed;
+    showToast(trimmed + " added!", "success");
+  });
+}
+
 // ── Helpers ──
 function getFY(dateStr) {
   if (!dateStr) return "";
@@ -484,15 +591,18 @@ function populateFilters() {
     sel.innerHTML = '<option value="">All People</option>' + people.map(p => '<option' + (p===val?' selected':'') + '>' + p + '</option>').join('');
   });
 }
-function filtered(mId, fyId, pId) {
+function filtered(mId, fyId, pId, projId) {
   const m = document.getElementById(mId).value;
   const fy = document.getElementById(fyId).value;
   const p = document.getElementById(pId).value;
+  const proj = projId ? document.getElementById(projId).value : "";
   return allEntries.filter(e =>
     e.name !== "__team_config__" &&
+    e.name !== "__proj_config__" &&
     (!m || e.month === m) &&
     (!fy || e.fy === fy) &&
-    (!p || e.name === p)
+    (!p || e.name === p) &&
+    (!proj || e.project === proj)
   );
 }
 
@@ -524,15 +634,19 @@ async function submitEntry() {
   if (!date) return showToast("Please select a week ending date.", "error");
   if (!hours || hours <= 0) return showToast("Please enter valid hours.", "error");
   if (!desc) return showToast("Please add a description.", "error");
+  const proj = document.getElementById("log-project").value;
+  if (!proj) return showToast("Please select a project.", "error");
   const btn = document.getElementById("submit-btn");
   btn.disabled = true; btn.textContent = "Saving…";
-  const { error } = await db.from("rd_entries").insert({ name, date, hours, description: desc, month: getMonth(date), fy: getFY(date) });
+  const project = document.getElementById("log-project").value;
+  const { error } = await db.from("rd_entries").insert({ name, date, hours, description: desc, project: project || null, month: getMonth(date), fy: getFY(date) });
   btn.disabled = false; btn.textContent = "✔  Submit Entry";
   if (error) return showToast("Error saving: " + error.message, "error");
   showToast("Saved! " + name + " — " + fmtDate(date) + " — " + hours + " hrs", "success");
   document.getElementById("log-name").value = "";
   document.getElementById("log-hours").value = "";
   document.getElementById("log-desc").value = "";
+  document.getElementById("log-project").value = "";
   document.getElementById("log-date").value = lastFriday();
   document.getElementById("log-fy").value = getFY(lastFriday());
 }
@@ -585,6 +699,7 @@ function openEditModal(id) {
   document.getElementById("edit-hours").value = e.hours;
   document.getElementById("edit-desc").value = e.description;
   document.getElementById("edit-fy").value = e.fy;
+  document.getElementById("edit-project").value = e.project || "";
   document.getElementById("edit-modal-overlay").classList.remove("hidden");
 }
 function closeEditModal() { document.getElementById("edit-modal-overlay").classList.add("hidden"); }
@@ -600,7 +715,8 @@ async function saveEdit() {
   if (!name || !date || !hours || !description) return showToast("All fields are required.", "error");
   const btn = document.getElementById("save-edit-btn");
   btn.disabled = true; btn.textContent = "Saving…";
-  const { error } = await db.from("rd_entries").update({ name, date, hours, description, month: getMonth(date), fy: getFY(date) }).eq("id", id);
+  const project = document.getElementById("edit-project").value;
+  const { error } = await db.from("rd_entries").update({ name, date, hours, description, project: project || null, month: getMonth(date), fy: getFY(date) }).eq("id", id);
   btn.disabled = false; btn.textContent = "Save Changes";
   if (error) return showToast("Error saving: " + error.message, "error");
   closeEditModal();
@@ -634,7 +750,7 @@ async function confirmDelete() {
 
 // ── Dashboard ──
 function renderDashboard() {
-  const data = filtered("d-month","d-fy","d-person");
+  const data = filtered("d-month","d-fy","d-person", null);
   const totalHrs = data.reduce((s,e) => s + Number(e.hours), 0);
   const avg = data.length ? totalHrs / data.length : 0;
   document.getElementById("d-total").textContent = totalHrs.toFixed(1);
@@ -679,13 +795,15 @@ function renderDashboard() {
 
 // ── All Entries ──
 function renderEntries() {
-  const rows = filtered("e-month","e-fy","e-person").sort((a,b) => b.date.localeCompare(a.date));
+  const rows = filtered("e-month","e-fy","e-person","e-project").sort((a,b) => b.date.localeCompare(a.date));
   const adminActions = isAdmin
     ? '<button class="btn-dark" style="background:transparent;color:var(--yellow-d);border:1.5px solid var(--yellow-m);border-radius:9px;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto;white-space:nowrap" onclick="openEmpModal()">👥 Manage Team</button>'
     : '';
   // Show manage team button in filter bar when admin
   const manageBtn = document.getElementById('manage-team-btn');
   if (manageBtn) manageBtn.style.display = isAdmin ? '' : 'none';
+  const manageProjBtn = document.getElementById('manage-proj-btn');
+  if (manageProjBtn) manageProjBtn.style.display = isAdmin ? '' : 'none';
 
   document.querySelector("#entries-table tbody").innerHTML = rows.length
     ? rows.map(e =>
@@ -693,15 +811,16 @@ function renderEntries() {
         "<td class='bold'>" + e.name + "</td>" +
         "<td class='mono muted'>" + fmtDate(e.date) + "</td>" +
         "<td class='mono bold accent'>" + Number(e.hours).toFixed(1) + "</td>" +
-        "<td><span class='tag'>" + e.month + "</span></td>" +
+        "<td>" + (e.project ? "<span class='tag'>" + e.project + "</span>" : "<span class='muted'>—</span>") + "</td>" +
+        "<td><span class='tag' style='background:rgba(255,255,255,.06);color:var(--text-m);border-color:var(--border)'>" + e.month + "</span></td>" +
         "<td class='muted'>" + e.fy + "</td>" +
-        "<td class='muted' style='max-width:220px'>" + e.description + "</td>" +
+        "<td class='muted' style='max-width:200px'>" + e.description + "</td>" +
         (isAdmin
           ? "<td><div class='action-cell'><button class='action-btn edit-btn' onclick='openEditModal(" + e.id + ")'>✏️ Edit</button><button class='action-btn delete-btn' onclick='openDeleteModal(" + e.id + ")'>🗑️ Delete</button></div></td>"
           : "<td style='display:none'></td>") +
         "</tr>"
       ).join('')
-    : '<tr><td colspan="' + (isAdmin ? 7 : 6) + '" class="empty">No entries yet — be the first to log hours!</td></tr>';
+    : '<tr><td colspan="' + (isAdmin ? 8 : 7) + '" class="empty">No entries yet — be the first to log hours!</td></tr>';
 }
 
 // ── Init ──
@@ -714,13 +833,16 @@ document.getElementById("login-modal-overlay").addEventListener("click", functio
 document.getElementById("edit-modal-overlay").addEventListener("click", function(e) { if (e.target===this) closeEditModal(); });
 document.getElementById("delete-modal-overlay").addEventListener("click", function(e) { if (e.target===this) closeDeleteModal(); });
 document.getElementById("emp-modal-overlay").addEventListener("click", function(e) { if (e.target===this) closeEmpModal(); });
+document.getElementById("proj-modal-overlay").addEventListener("click", function(e) { if (e.target===this) closeProjModal(); });
 
 // Add manage team button to All Entries filter bar
 document.querySelector('#tab-data .filter-bar').insertAdjacentHTML('beforeend',
-  '<button id="manage-team-btn" class="action-btn edit-btn" style="display:none;margin-left:auto;padding:9px 16px;font-size:12.5px" onclick="openEmpModal()">👥 Manage Team</button>'
+  '<button id="manage-team-btn" class="action-btn edit-btn" style="display:none;margin-left:auto;padding:9px 16px;font-size:12.5px" onclick="openEmpModal()">👥 Manage Team</button>' +
+  '<button id="manage-proj-btn" class="action-btn edit-btn" style="display:none;padding:9px 16px;font-size:12.5px" onclick="openProjModal()">🗂️ Manage Projects</button>'
 );
 
 loadTeam();
+loadProjects();
 </script>
 <!-- Created by Mitchell Lavery -->
 <div style="position:fixed;bottom:10px;right:14px;font-size:10px;color:rgba(255,255,255,.12);font-family:'DM Sans',sans-serif;pointer-events:none;letter-spacing:.04em;user-select:none;">
