@@ -189,7 +189,9 @@ tr:hover td { background: var(--grey-l); }
         <p>Shared in real time across the whole team</p>
       </div>
     </div>
-    <button class="admin-pill" id="admin-toggle-btn" onclick="toggleAdminLogin()">🔐 Admin</button>
+    <div style="display:flex;align-items:center;gap:.6rem">
+      <button class="admin-pill" id="admin-toggle-btn" onclick="toggleAdminLogin()">🔐 Admin</button>
+    </div>
   </div>
 
   <div class="admin-banner" id="admin-banner" style="display:none">
@@ -275,6 +277,17 @@ tr:hover td { background: var(--grey-l); }
       <select id="e-fy" onchange="renderEntries()"><option value="">All Financial Years</option></select>
       <select id="e-person" onchange="renderEntries()"><option value="">All People</option></select>
       <select id="e-project" onchange="renderEntries()"><option value="">All Projects</option></select>
+    </div>
+    <div style="display:flex;gap:.6rem;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-weight:700;color:var(--text-m);text-transform:uppercase;letter-spacing:.05em">Export filtered data:</span>
+      <button onclick="exportExcel()" style="font-family:inherit;font-size:13px;font-weight:700;padding:9px 18px;background:var(--dark3);color:#1D6F42;border:1.5px solid rgba(29,111,66,.4);border-radius:9px;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:6px" onmouseover="this.style.background='rgba(29,111,66,.15)'" onmouseout="this.style.background='var(--dark3)'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Export Excel
+      </button>
+      <button onclick="exportPDF()" style="font-family:inherit;font-size:13px;font-weight:700;padding:9px 18px;background:var(--dark3);color:#E04040;border:1.5px solid rgba(224,64,64,.4);border-radius:9px;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:6px" onmouseover="this.style.background='rgba(224,64,64,.12)'" onmouseout="this.style.background='var(--dark3)'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Export PDF
+      </button>
     </div>
     <div class="table-wrap"><table id="entries-table"><thead><tr>
       <th>Person</th><th>Week Ending</th><th>Hours</th><th>Project</th><th>Month</th><th>Fin. Year</th><th>Description</th>
@@ -618,10 +631,19 @@ function switchTab(name, btn) {
 
 // ── Load from Supabase ──
 async function loadEntries() {
-  const { data, error } = await db.from("rd_entries").select("*").order("date", { ascending: false });
-  if (error) { showToast("Error loading data", "error"); return; }
-  allEntries = (data || []).map(e => ({ ...e, month: e.month || getMonth(e.date), fy: e.fy || getFY(e.date) }));
-  populateFilters();
+  try {
+    const { data, error } = await db.from("rd_entries").select("*").order("date", { ascending: false });
+    if (error) {
+      console.error("Supabase error:", error);
+      showToast("Error loading data: " + error.message, "error");
+      return;
+    }
+    allEntries = (data || []).map(e => ({ ...e, month: e.month || getMonth(e.date), fy: e.fy || getFY(e.date) }));
+    populateFilters();
+  } catch(err) {
+    console.error("Load error:", err);
+    showToast("Connection error — please refresh.", "error");
+  }
 }
 
 // ── Submit entry ──
@@ -841,11 +863,146 @@ document.querySelector('#tab-data .filter-bar').insertAdjacentHTML('beforeend',
   '<button id="manage-proj-btn" class="action-btn edit-btn" style="display:none;padding:9px 16px;font-size:12.5px" onclick="openProjModal()">🗂️ Manage Projects</button>'
 );
 
+// ── Export ──
+function getExportRows() {
+  return filtered("e-month","e-fy","e-person","e-project").sort((a,b) => b.date.localeCompare(a.date));
+}
+function getExportLabel() {
+  const m = document.getElementById('e-month').value;
+  const fy = document.getElementById('e-fy').value;
+  const p = document.getElementById('e-person').value;
+  const proj = document.getElementById('e-project').value;
+  const parts = [];
+  if (m) parts.push(m);
+  if (fy) parts.push('FY' + fy);
+  if (p) parts.push(p);
+  if (proj) parts.push(proj);
+  return parts.length ? parts.join('_') : 'All';
+}
+
+function exportExcel() {
+  const rows = getExportRows();
+  if (!rows.length) return showToast("No data to export.", "error");
+  const headers = ["Person","Week Ending","Hours","Project","Month","Financial Year","Description"];
+  const csvRows = [headers.join(',')];
+  rows.forEach(e => {
+    const vals = [
+      '"' + (e.name||'').replace(/"/g,'""') + '"',
+      '"' + fmtDate(e.date) + '"',
+      Number(e.hours).toFixed(1),
+      '"' + (e.project||'').replace(/"/g,'""') + '"',
+      '"' + (e.month||'').replace(/"/g,'""') + '"',
+      '"' + (e.fy||'').replace(/"/g,'""') + '"',
+      '"' + (e.description||'').replace(/"/g,'""') + '"'
+    ];
+    csvRows.push(vals.join(','));
+  });
+  // Add summary row
+  const totalHrs = rows.reduce((s,e) => s + Number(e.hours), 0);
+  csvRows.push('');
+  csvRows.push('"Total Hours","","' + totalHrs.toFixed(1) + '","","","",""');
+  csvRows.push('"Total Entries","","' + rows.length + '","","","",""');
+  // BOM for Excel UTF-8
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'RnD_Hours_' + getExportLabel() + '_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast("Excel file downloaded!", "success");
+}
+
+let easterEggShown = false;
+function showEasterEgg() {
+  if (easterEggShown) return;
+  easterEggShown = true;
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)" onclick="this.remove()">
+      <div style="background:linear-gradient(135deg,#1a1500,#0a0a00);border:2px solid #F5B800;border-radius:20px;padding:2.5rem 3rem;max-width:420px;text-align:center;box-shadow:0 0 60px rgba(245,184,0,.3)">
+        <div style="font-size:48px;margin-bottom:1rem">🎖️</div>
+        <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#F5B800;font-weight:700;margin-bottom:.5rem">Six Sigma Black Belt</div>
+        <div style="font-size:26px;font-weight:700;color:#fff;margin-bottom:.75rem;letter-spacing:-.3px">Emilien</div>
+        <div style="font-size:15px;color:rgba(245,184,0,.8);font-weight:600;font-style:italic">Six Sigma Savant</div>
+        <div style="margin-top:1.5rem;font-size:11px;color:rgba(255,255,255,.3)">click anywhere to dismiss</div>
+      </div>
+    </div>`;
+  document.body.appendChild(el.firstElementChild);
+}
+
+function exportPDF() {
+  const rows = getExportRows();
+  if (!rows.length) return showToast("No data to export.", "error");
+  const totalHrs = rows.reduce((s,e) => s + Number(e.hours), 0);
+  const label = getExportLabel();
+  const dateStr = new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'});
+
+  // Build print-friendly HTML
+  const tableRows = rows.map((e,i) =>
+    '<tr style="background:' + (i%2===0?'#fff':'#f9f9f9') + '">' +
+    '<td>' + (e.name||'') + '</td>' +
+    '<td>' + fmtDate(e.date) + '</td>' +
+    '<td style="text-align:center">' + Number(e.hours).toFixed(1) + '</td>' +
+    '<td>' + (e.project||'—') + '</td>' +
+    '<td>' + (e.month||'') + '</td>' +
+    '<td>' + (e.fy||'') + '</td>' +
+    '<td style="max-width:240px;word-wrap:break-word">' + (e.description||'') + '</td>' +
+    '</tr>'
+  ).join('');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+<title>Kennewell R&D Hours — ${label}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family: -apple-system, Arial, sans-serif; color:#222; background:#fff; padding:2rem; }
+  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:3px solid #F5B800; }
+  .header-left h1 { font-size:22px; font-weight:700; color:#1C1C1E; }
+  .header-left p { font-size:12px; color:#666; margin-top:3px; }
+  .header-right { text-align:right; font-size:11px; color:#666; }
+  .summary { display:flex; gap:1.5rem; margin-bottom:1.5rem; }
+  .summary-card { background:#f8f8f8; border:1px solid #e0e0e0; border-radius:8px; padding:.75rem 1.25rem; }
+  .summary-card .val { font-size:24px; font-weight:700; color:#C49200; font-family:monospace; }
+  .summary-card .lbl { font-size:11px; color:#666; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { background:#F5B800; color:#1C1C1E; padding:9px 12px; text-align:left; font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; }
+  td { padding:8px 12px; border-bottom:1px solid #eee; vertical-align:top; }
+  .footer { margin-top:1.5rem; font-size:10px; color:#aaa; text-align:center; border-top:1px solid #eee; padding-top:1rem; }
+  @media print { body { padding:1cm; } button { display:none !important; } }
+</style>
+</head><body>
+<div class="header">
+  <div class="header-left">
+    <h1>Kennewell — R&D Hours Report</h1>
+    <p>Filter: ${label} &nbsp;|&nbsp; Generated: ${dateStr}</p>
+  </div>
+  <div class="header-right">
+    <button onclick="window.print()" style="background:#F5B800;border:none;padding:8px 18px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:6px;display:block;width:100%">🖨️ Print / Save PDF</button>
+    <div>Use browser print → Save as PDF</div>
+  </div>
+</div>
+<div class="summary">
+  <div class="summary-card"><div class="val">${totalHrs.toFixed(1)}</div><div class="lbl">Total Hours</div></div>
+  <div class="summary-card"><div class="val">${rows.length}</div><div class="lbl">Entries</div></div>
+  <div class="summary-card"><div class="val">${(totalHrs/Math.max(rows.length,1)).toFixed(1)}</div><div class="lbl">Avg Hrs/Entry</div></div>
+</div>
+<table>
+  <thead><tr><th>Person</th><th>Week Ending</th><th>Hours</th><th>Project</th><th>Month</th><th>Fin. Year</th><th>Description</th></tr></thead>
+  <tbody>${tableRows}</tbody>
+</table>
+<div class="footer">Kennewell R&D Hours Tracker &nbsp;|&nbsp; Built by Mitchell Lavery &nbsp;|&nbsp; Confidential</div>
+</body></html>`);
+  win.document.close();
+  showToast("PDF preview opened!", "success");
+}
+
 loadTeam();
 loadProjects();
 </script>
 <!-- Created by Mitchell Lavery -->
-<div style="position:fixed;bottom:10px;right:14px;font-size:10px;color:rgba(255,255,255,.12);font-family:'DM Sans',sans-serif;pointer-events:none;letter-spacing:.04em;user-select:none;">
+<div onclick="showEasterEgg()" style="position:fixed;bottom:10px;right:14px;font-size:10px;color:rgba(255,255,255,.12);font-family:'DM Sans',sans-serif;letter-spacing:.04em;user-select:none;cursor:default;">
   Built by Mitchell Lavery
 </div>
 </body>
